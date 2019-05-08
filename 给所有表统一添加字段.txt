@@ -1,0 +1,47 @@
+DROP PROCEDURE IF EXISTS testEndHandle;
+DELIMITER $$
+ 
+CREATE PROCEDURE testEndHandle()
+BEGIN
+DECLARE jzs_tablename VARCHAR(255);#定义变量
+
+ DECLARE cur_table_structure CURSOR#定义游标
+ FOR 
+ SELECT table_name 
+ FROM INFORMATION_SCHEMA.TABLES #information_schema是系统自动生成的表
+ WHERE table_schema = 'jianzhishu'
+ ORDER BY table_name;
+ 
+DECLARE CONTINUE HANDLER FOR SQLSTATE '02000' SET jzs_tablename = NULL;#固定格式，声明游标可访问的变量
+ 
+OPEN cur_table_structure;#开启游标
+ 
+FETCH cur_table_structure INTO jzs_tablename;#把游标注入变量
+WHILE ( jzs_tablename IS NOT NULL) DO
+
+IF EXISTS (SELECT * FROM information_schema.columns where table_name = jzs_tablename and column_name = 'deletetime') THEN
+  
+BEGIN
+set @stmt = CONCAT("alter table `",jzs_tablename,"` drop column `deletetime`");
+prepare tpstmt from @stmt;#准备执行sql
+execute tpstmt;#执行sql
+END;
+
+END IF;
+
+SET @MyQuery=CONCAT("alter table `",jzs_tablename,"` add column `deletetime` int(11) default 0 COMMENT '删除时间' after `updatetime` ");
+  
+  PREPARE msql FROM @MyQuery;
+  
+  EXECUTE msql ;   
+  FETCH cur_table_structure INTO jzs_tablename;#游标移动并赋值给变量，i++
+  
+  END WHILE;
+ CLOSE cur_table_structure;#关闭游标
+ 
+ 
+END
+ $$
+ 
+ #执行存储过程
+ CALL testEndHandle();
